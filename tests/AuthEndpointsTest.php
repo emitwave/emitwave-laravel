@@ -12,12 +12,12 @@ class AuthEndpointsTest extends TestCase
     public function test_authenticated_host_user_receives_connection_token(): void
     {
         $client = $this->createMock(Client::class);
-        $client->expects($this->once())->method('connectionToken')->with('42')->willReturn([
+        $client->expects($this->once())->method('connectionToken')->with('42', [], 'https://toladot.com')->willReturn([
             'token' => 'connection.jwt', 'ttl' => 900, 'app_id' => 'app_1',
         ]);
         $this->app->instance(Client::class, $client);
 
-        $this->withHeader('X-Test-User', '42')->postJson('/emitwave/connect-token')
+        $this->withHeaders(['X-Test-User' => '42', 'Origin' => 'https://toladot.com'])->postJson('/emitwave/connect-token')
             ->assertOk()
             ->assertExactJson(['token' => 'connection.jwt', 'ttl' => 900, 'app_id' => 'app_1']);
     }

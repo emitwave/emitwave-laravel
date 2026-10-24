@@ -77,6 +77,9 @@ Emitwave::channel('presence-room.{room}', fn ($user, string $room): array => [
 ```
 
 The browser calls these endpoints on your own Laravel origin. Laravel owns user authentication and authorization; the package makes a signed server-to-server request to Emitwave to mint the final realtime token.
+The connection endpoint forwards the browser's `Origin` inside that signed
+request, allowing Emitwave to enforce the application's configured origin list
+without maintaining a global WebSocket-domain list.
 
 ## Security boundaries
 

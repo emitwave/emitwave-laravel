@@ -19,7 +19,11 @@ class ConnectTokenController
         $userId = method_exists($user, 'getAuthIdentifier') ? $user->getAuthIdentifier() : $user->id;
 
         try {
-            return response()->json($client->connectionToken((string) $userId));
+            return response()->json($client->connectionToken(
+                (string) $userId,
+                [],
+                $request->header('Origin'),
+            ));
         } catch (EmitwaveException $exception) {
             return response()->json(
                 ['message' => $exception->getMessage()],
