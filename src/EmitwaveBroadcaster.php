@@ -19,15 +19,15 @@ class EmitwaveBroadcaster extends Broadcaster
         }
     }
 
-    // Emitwave channel authorization is the control-plane's channel-auth endpoint,
-    // not this driver. This broadcaster only SENDS.
+    // Emitwave channel authorization is handled by the package's first-party
+    // routes, not this sending-only driver.
     public function auth($request)
     {
-        throw new \RuntimeException('Emitwave channel auth is handled by the control-plane channel-auth endpoint.');
+        throw new \RuntimeException('Emitwave channel auth is handled by the first-party /emitwave/channel-auth endpoint.');
     }
 
     public function validAuthenticationResponse($request, $result)
     {
-        throw new \RuntimeException('Emitwave channel auth is handled by the control-plane channel-auth endpoint.');
+        throw new \RuntimeException('Emitwave channel auth is handled by the first-party /emitwave/channel-auth endpoint.');
     }
 }

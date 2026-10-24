@@ -1,6 +1,6 @@
 {
     "name": "emitwave/laravel",
-    "description": "EmitWave broadcasting driver for Laravel.",
+    "description": "EmitWave broadcasting and first-party realtime authentication for Laravel.",
     "type": "library",
     "license": "MIT",
     "homepage": "https://github.com/emitwave/emitwave-laravel",

@@ -1,6 +1,6 @@
 # `emitwave/laravel`
 
-Laravel broadcasting driver backed by Emitwave.
+Laravel broadcasting driver and same-origin browser authentication endpoints backed by Emitwave.
 
 ## Requirements
 
@@ -13,28 +13,9 @@ The service provider is discovered automatically by Laravel.
 
 ## Installation
 
-While developing from this monorepo, add both local packages to the consuming
-application's `composer.json`:
-
-```json
-{
-  "repositories": [
-    { "type": "path", "url": "../packages/php-sdk" },
-    { "type": "path", "url": "../packages/laravel-sdk" }
-  ],
-  "require": {
-    "emitwave/laravel": "@dev"
-  }
-}
-```
-
-Then run:
-
 ```bash
-composer update emitwave/laravel
+composer require emitwave/laravel
 ```
-
-After a public release, use `composer require emitwave/laravel`.
 
 ## Configure broadcasting
 
@@ -65,19 +46,50 @@ EMITWAVE_SECRET=your_server_secret
 Keep `EMITWAVE_SECRET` outside source control and browser-visible environment
 variables.
 
-## Authentication boundaries
+Publish the package configuration when you need to change the route prefix or middleware:
+
+```bash
+php artisan vendor:publish --tag=emitwave-config
+```
+
+## Browser authentication
+
+The package registers two same-origin POST routes:
+
+- `/emitwave/connect-token` authenticates the current Laravel user and returns a short-lived connection token.
+- `/emitwave/channel-auth` evaluates your channel callback and returns a scoped subscription token.
+
+The default middleware is `['web', 'auth']`. For Sanctum APIs or another authentication stack, publish the config and set the middleware used by your application.
+
+Register private and presence channel rules during application boot:
+
+```php
+use Emitwave\Laravel\Facades\Emitwave;
+
+Emitwave::channel('private-account.{account}', function ($user, string $account): bool {
+    return $user->accounts()->whereKey($account)->exists();
+});
+
+Emitwave::channel('presence-room.{room}', fn ($user, string $room): array => [
+    'id' => (string) $user->getAuthIdentifier(),
+    'info' => ['name' => $user->name],
+]);
+```
+
+The browser calls these endpoints on your own Laravel origin. Laravel owns user authentication and authorization; the package makes a signed server-to-server request to Emitwave to mint the final realtime token.
+
+## Security boundaries
 
 The broadcasting driver only handles trusted server publishing:
 
 - `EMITWAVE_KEY` and `EMITWAVE_SECRET` sign publish requests;
 - the browser public application key identifies the app during connection;
-- an end-user Bearer token authenticates the browser to the control plane;
-- the control plane issues connection and subscription tokens;
-- private/presence authorization callbacks are evaluated by the Emitwave
-  control plane, not by this broadcaster.
+- the browser authenticates to your Laravel application using its normal session or API authentication;
+- channel callbacks execute inside your Laravel application;
+- the package signs token-mint requests with the server credential;
+- the global realtime signing secret remains inside Emitwave.
 
-Calling the broadcaster's `auth()` methods therefore raises an exception. Point
-browser SDKs at the Emitwave `/connect-token` and `/channel-auth` endpoints.
+Calling the broadcaster's legacy `auth()` methods raises an exception. The browser SDK uses the package routes above instead.
 
 ## Channel types
 
@@ -87,8 +99,8 @@ external prefixes:
 | Emitwave channel | Laravel broadcast target | Subscriber authorization |
 |---|---|---|
 | Public | `new Channel('news')` | Connection token only |
-| Private | `new PrivateChannel('account.42')` | Truthy control-plane callback for `private-account.42` |
-| Presence | `new PresenceChannel('room.lobby')` | Control-plane callback returning `{ id, info }` |
+| Private | `new PrivateChannel('account.42')` | Truthy host-application callback for `private-account.42` |
+| Presence | `new PresenceChannel('room.lobby')` | Host callback returning `{ id, info }` |
 | Public cache | `new Channel('cache-prices')` | Connection token only |
 | Private cache | `new Channel('private-cache-account.42')` | Truthy private callback |
 | Presence cache | `new Channel('presence-cache-room.lobby')` | Presence callback returning `{ id, info }` |
@@ -133,8 +145,8 @@ OrderCreated::dispatch(['id' => 'ord_123', 'total' => 4900]);
 ```
 
 Laravel private and presence channel names are forwarded with their prefixes.
-Browser subscription authorization is handled by Emitwave's control-plane
-channel-auth endpoint, not by this broadcaster's `auth()` method.
+Browser subscription authorization is handled by the package's same-origin
+`/emitwave/channel-auth` route, not by the broadcaster's `auth()` method.
 
 If a PSR-18 `ClientInterface` is bound in Laravel's container, the driver uses
 it. Otherwise it uses the cURL transport from `emitwave/php`.
