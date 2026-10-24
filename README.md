@@ -80,6 +80,8 @@ The browser calls these endpoints on your own Laravel origin. Laravel owns user 
 The connection endpoint forwards the browser's `Origin` inside that signed
 request, allowing Emitwave to enforce the application's configured origin list
 without maintaining a global WebSocket-domain list.
+An empty allowed-origin list accepts every origin. Once the application has at
+least one configured origin, only exact configured origins are accepted.
 
 ## Security boundaries
 
