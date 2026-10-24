@@ -3,6 +3,7 @@
 namespace Emitwave\Laravel\Http\Controllers;
 
 use Emitwave\Client;
+use Emitwave\EmitwaveException;
 use Emitwave\Laravel\ChannelRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,7 +31,11 @@ class ChannelAuthController
             }
             $id = (string) $result['id'];
             $info = is_array($result['info'] ?? null) ? $result['info'] : [];
-            $minted = $client->subscriptionToken($id, $channel, $info);
+            try {
+                $minted = $client->subscriptionToken($id, $channel, $info);
+            } catch (EmitwaveException $exception) {
+                return $this->errorResponse($exception);
+            }
 
             return response()->json([
                 'subscription_token' => $minted['token'],
@@ -44,7 +49,11 @@ class ChannelAuthController
         }
 
         $userId = method_exists($user, 'getAuthIdentifier') ? $user->getAuthIdentifier() : $user->id;
-        $minted = $client->subscriptionToken((string) $userId, $channel);
+        try {
+            $minted = $client->subscriptionToken((string) $userId, $channel);
+        } catch (EmitwaveException $exception) {
+            return $this->errorResponse($exception);
+        }
 
         $response = [
             'subscription_token' => $minted['token'],
@@ -56,5 +65,14 @@ class ChannelAuthController
         }
 
         return response()->json($response);
+    }
+
+    private function errorResponse(EmitwaveException $exception): JsonResponse
+    {
+        $status = $exception->status >= 400 && $exception->status <= 599
+            ? $exception->status
+            : 502;
+
+        return response()->json(['message' => $exception->getMessage()], $status);
     }
 }

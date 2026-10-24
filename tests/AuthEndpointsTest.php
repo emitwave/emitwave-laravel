@@ -3,6 +3,7 @@
 namespace Emitwave\Laravel\Tests;
 
 use Emitwave\Client;
+use Emitwave\EmitwaveException;
 use Emitwave\Laravel\Facades\Emitwave;
 use Illuminate\Http\Request;
 
@@ -102,6 +103,29 @@ class AuthEndpointsTest extends TestCase
             ->assertUnprocessable();
         $this->withHeader('X-Test-User', '42')->postJson('/emitwave/channel-auth', ['channel' => 'news'])
             ->assertUnprocessable();
+    }
+
+    public function test_gateway_errors_return_only_a_safe_message(): void
+    {
+        Emitwave::channel('private-user.{id}', fn ($user, string $id): bool => (string) $user->id === $id);
+        $client = $this->createMock(Client::class);
+        $client->method('connectionToken')->willThrowException(
+            new EmitwaveException(422, '{"error":{"code":"INVALID_TOKEN_REQUEST"}}'),
+        );
+        $client->method('subscriptionToken')->willThrowException(
+            new EmitwaveException(503, '{"error":{"code":"TOKEN_MINT_FAILED"}}'),
+        );
+        $this->app->instance(Client::class, $client);
+
+        $this->withHeader('X-Test-User', '42')
+            ->postJson('/emitwave/connect-token')
+            ->assertStatus(422)
+            ->assertExactJson(['message' => 'Emitwave publish failed (HTTP 422)']);
+
+        $this->withHeader('X-Test-User', '42')
+            ->postJson('/emitwave/channel-auth', ['channel' => 'private-user.42'])
+            ->assertStatus(503)
+            ->assertExactJson(['message' => 'Emitwave publish failed (HTTP 503)']);
     }
 }
 
